@@ -6,13 +6,22 @@ const ctx = document.getElementById('myChart').getContext('2d');
 
 console.log(window.data);
 
+function getRandomColor() {
+  const r = Math.floor(Math.random() * 255);
+  const g = Math.floor(Math.random() * 255);
+  const b = Math.floor(Math.random() * 255);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+
+
 const myChart = new Chart(ctx, {
 		type: 'scatter',
 		data: {
 				datasets: [{
 						label: 'Youtube channels',
 						data: window.data,
-						backgroundColor: 'rgba(54, 162, 235, 0.7)',
+						pointBackgroundColor: window.data.map(() => getRandomColor()),
 						pointRadius: 10
 				}]
 		},
