@@ -6,23 +6,23 @@ const {getInputs, getChannelsFromSearchQuery} = require('./get-inputs.js');
 
 async function begin() {
 
-    // let [query, rangeStart, rangeEnd] = await getInputs();
-    // // let [query, rangeStart, rangeEnd] = ['MLBB', 1, 100];
+    let [query, rangeStart, rangeEnd] = await getInputs();
+    // let [query, rangeStart, rangeEnd] = ['MLBB', 1, 100];
 
-    // let result = await getChannelsFromSearchQuery(query, rangeStart, rangeEnd);
+    let result = await getChannelsFromSearchQuery(query, rangeStart, rangeEnd);
 
-    // console.log(result);
+    console.log(result);
     
     
-    // const dataToWrite = `window.data = ${JSON.stringify(result)}`;
-    // const filePath = 'data-generator.js';
+    const dataToWrite = `window.data = ${JSON.stringify(result)}`;
+    const filePath = 'data-generator.js';
 
-    // try {
-    //     await fsp.writeFile(filePath, dataToWrite);
-    //     console.log('File written successfully!');
-    // } catch {
-    //     console.error('Error writing to file:', err);
-    // }
+    try {
+        await fsp.writeFile(filePath, dataToWrite);
+        console.log('File written successfully!');
+    } catch {
+        console.error('Error writing to file:', err);
+    }
 
     const server = http.createServer((req, res) => {
         let filePath = '.' + req.url;

@@ -81,7 +81,7 @@ async function getChannelsFromSearchQuery(query, rangeStart, rangeEnd) {
     }
 
     channelLinks = channelLinks.slice(rangeStart-1, rangeEnd);
-    console.log(channelLinks);
+    // console.log(channelLinks);
 
     console.log("Processing channels, please wait...");
     let finalResult = [];
@@ -180,7 +180,7 @@ async function getChannelsFromSearchQuery(query, rangeStart, rangeEnd) {
         finalResult.push(result);
     }
 
-    console.log(finalResult);
+    // console.log(finalResult);
     await browser.close();
 
 		return finalResult;
