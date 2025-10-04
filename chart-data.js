@@ -26,6 +26,20 @@ const myChart = new Chart(ctx, {
 				}]
 		},
 		options: {
+				onClick: (event, elements, chart) => {
+					if (elements.length > 0) {
+						// Get the first clicked element (assuming one point clicked at a time)
+						const clickedElement = elements[0]; 
+
+						console.log(clickedElement);
+
+						let elemIndex = clickedElement.index;
+
+						window.open(window.data[elemIndex].channelLink, '_blank');
+						// You can now perform actions based on the clicked point,
+						// e.g., open a modal, navigate to a different page, update other elements.
+					}
+				},
 				responsive: true,
 				maintainAspectRatio: false,
 				plugins: {

@@ -2,17 +2,34 @@ const http = require('http');
 const fs =  require('fs');
 const fsp = require('fs').promises;
 const path =  require('path');
-const {getInputs, getChannelsFromSearchQuery} = require('./get-inputs.js');
+const {getInputs, getChannelsFromSearchQuery, getChannelsFromVideoLink, askQuestion} = require('./get-inputs.js');
+
 
 async function begin() {
+    console.log("Starting channel retriever...");
+    let input = 0;
+    
+    
+    while (input !== '1' && input !== '2') {
+       input = await askQuestion("Press 1 to retrieve by video link, press 2 to retrieve by Search query: ");
+    }
 
-    let [query, rangeStart, rangeEnd] = await getInputs();
-    // let [query, rangeStart, rangeEnd] = ['MLBB', 1, 100];
+    let result;
 
-    let result = await getChannelsFromSearchQuery(query, rangeStart, rangeEnd);
+    console.log("\n");
+
+    switch(input) {
+        case '1':
+            let videoLink = await askQuestion("Please enter a video link: ");
+            result = await getChannelsFromVideoLink(videoLink);
+            break;
+        default:
+            let [query, rangeStart, rangeEnd] = await getInputs();
+            result = await getChannelsFromSearchQuery(query, rangeStart, rangeEnd);
+    }
+
 
     console.log(result);
-    
     
     const dataToWrite = `window.data = ${JSON.stringify(result)}`;
     const filePath = 'data-generator.js';
@@ -22,8 +39,15 @@ async function begin() {
         console.log('File written successfully!');
     } catch {
         console.error('Error writing to file:', err);
+        return
     }
 
+    startServer()
+
+}
+
+async function startServer() {
+    
     const server = http.createServer((req, res) => {
         let filePath = '.' + req.url;
         if (filePath === './') filePath = './index.html';

@@ -57,133 +57,203 @@ function extractItems() {
 	return links
 }
 
-async function getChannelsFromSearchQuery(query, rangeStart, rangeEnd) {
-    const browser = await puppeteer.launch();
-    const page = await browser.newPage();
-  	page.setViewport({ width: 1280, height: 926 });
+async function processChannels(page, channelLinks) {
+  let finalResult = [];
 
-
-		
-    // Search for all channels for a given query
-    await page.goto(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAg%253D%253D`, { waitUntil: 'networkidle2' });
-    await page.waitForSelector("div#container.ytd-search.style-scope", { timeout: 10000 });
-		
-
-		console.log("Scraping channels");
-
-		let channelLinks = await scrapeInfiniteScrollItems(page, extractItems, rangeEnd);
-
-    // print channel links to console
-    if (channelLinks.length < rangeStart || channelLinks.length < rangeEnd) {
-        console.log(`Only retrieved ${channelLinks.length} channels, therefore could not get channels in the range of ${rangeStart} up to ${rangeEnd}`);
-        browser.close();
-        return
-    }
-
-    channelLinks = channelLinks.slice(rangeStart-1, rangeEnd);
-    // console.log(channelLinks);
-
-    console.log("Processing channels, please wait...");
-    let finalResult = [];
-
-    // for each channel link, do something
-		let numberOfChannels = channelLinks.length;
-    for (let i = 0; i < numberOfChannels; i++) {
-			let [channelLink, channelName] = channelLinks[i];
-			console.log(`Processing channel ${i+1}...`);
+  // for each channel link, do something
+  let numberOfChannels = channelLinks.length;
+  for (let i = 0; i < numberOfChannels; i++) {
+    let [channelLink, channelName] = channelLinks[i];
+    console.log(`Processing channel ${i+1}...`);
+    
+      // console.log(channelLink);
       
-        // console.log(channelLink);
-        
-        // Scrape channel page
-        await page.goto(channelLink, { waitUntil: 'networkidle2' });
-        await page.waitForSelector('.yt-core-attributed-string', { timeout: 10000 });
+    // Scrape channel page
+    await page.goto(channelLink, { waitUntil: 'networkidle2' });
+    await page.waitForSelector('.yt-core-attributed-string', { timeout: 10000 });
 
-        
-        // Get Subscriber count
-        const subscriberCount = await page.evaluate(() => {
-            let query = `yt-content-metadata-view-model span.yt-core-attributed-string.yt-content-metadata-view-model__metadata-text.yt-core-attributed-string--white-space-pre-wrap.yt-core-attributed-string--link-inherit-color`;
-            const subscribeTextElem = document.querySelectorAll(query)[1].textContent.trim();
-            return subscribeTextElem ? subscribeTextElem : "Subscriber count not found";
-        });
+    
+    // Get Subscriber count
+    const subscriberCount = await page.evaluate(() => {
+      let query = `yt-content-metadata-view-model span.yt-core-attributed-string.yt-content-metadata-view-model__metadata-text.yt-core-attributed-string--white-space-pre-wrap.yt-core-attributed-string--link-inherit-color`;
+      const subscribeTextElem = document.querySelectorAll(query)[1].textContent.trim();
+      return subscribeTextElem ? subscribeTextElem : "Subscriber count not found";
+    });
 
-        // console.log(subscriberCount)
+    // console.log(subscriberCount)
 
-        // Email link (if available)
-        const emailLink = await page.evaluate(() => {
-            const mailElem = Array.from(document.querySelectorAll('a')).find(a => a.href.startsWith('mailto:'));
-            return mailElem ? mailElem.href : 'Email not found';
-        });
+    // Email link (if available)
+    const emailLink = await page.evaluate(() => {
+      const mailElem = Array.from(document.querySelectorAll('a')).find(a => a.href.startsWith('mailto:'));
+      return mailElem ? mailElem.href : 'Email not found';
+    });
 
-        // console.log(emailLink);
-        
-        // Get last 10 videos
-        await page.goto(`${channelLink}/videos`, { waitUntil: 'networkidle2' });
-        await page.waitForSelector('ytd-rich-grid-renderer', { timeout: 10000 });
-        
-        const videos = await page.evaluate(() => {
-            // get all video elems
-            const videoElems = Array.from(document.querySelectorAll('ytd-rich-item-renderer'));
+    // console.log(emailLink);
+    
+    // Get last 10 videos
+    await page.goto(`${channelLink}/videos`, { waitUntil: 'networkidle2' });
+    await page.waitForSelector('ytd-rich-grid-renderer', { timeout: 10000 });
+    
+    const videos = await page.evaluate(() => {
+      // get all video elems
+      const videoElems = Array.from(document.querySelectorAll('ytd-rich-item-renderer'));
 
-            // initialize result
-            let result = []
-            for (const videoElem of videoElems) {
-                let viewsText = videoElem.querySelector('ytd-rich-grid-media ytd-video-meta-block span.ytd-video-meta-block')?.textContent || '';
-                let dateText = videoElem.querySelectorAll('#metadata-line span')[1]?.textContent || '';
-                const membersOnly = videoElem.querySelector('ytd-rich-grid-media ytd-badge-supported-renderer div.badge.badge-style-type-members-only')?.innerHTML ? true : false;
+      // initialize result
+      let result = []
+      for (const videoElem of videoElems) {
+          let viewsText = videoElem.querySelector('ytd-rich-grid-media ytd-video-meta-block span.ytd-video-meta-block')?.textContent || '';
+          let dateText = videoElem.querySelectorAll('#metadata-line span')[1]?.textContent || '';
+          const membersOnly = videoElem.querySelector('ytd-rich-grid-media ytd-badge-supported-renderer div.badge.badge-style-type-members-only')?.innerHTML ? true : false;
 
-                
-                if (membersOnly) { // if members only, cannot see views, so skip
-                    continue
-                    // [viewsText, dateText] = [dateText, viewsText]
-                }
+          
+          if (membersOnly) { // if members only, cannot see views, so skip
+              continue
+              // [viewsText, dateText] = [dateText, viewsText]
+          }
 
-                result.push({viewsText, dateText});
+          result.push({viewsText, dateText});
 
-                // we only need the most recent 10;
+          // we only need the most recent 10;
 
-                if (result.length >= 10) {
-                    break
-                }
-            }
-            // return videoElems.map(el => {
-            //     return { viewsText, dateText };
-            // });
+          if (result.length >= 10) {
+              break
+          }
+      }
+      // return videoElems.map(el => {
+      //     return { viewsText, dateText };
+      // });
 
-            return result;
-        });
+      return result;
+    });
 
-        // console.log(videos);
-        
-        let totalViews = 0, totalDays = 0;
-        videos.forEach(({ viewsText, dateText }) => {
-            const views = parseViews(viewsText);
-            totalViews += views;
-            totalDays += parseDaysAgo(dateText);
-        });
-        
-        const avgViews = totalViews / videos.length;
-        const avgUploadRate = videos.length / totalDays;
+    // console.log(videos);
+    
+    let totalViews = 0, totalDays = 0;
+    videos.forEach(({ viewsText, dateText }) => {
+      const views = parseViews(viewsText);
+      totalViews += views;
+      totalDays += parseDaysAgo(dateText);
+    });
+    
+    const avgViews = totalViews / videos.length;
+    const avgUploadRate = videos.length / totalDays;
 
-        const result = {
-            channelName,
-            channelLink,
-            subscriberCount,
-						x: avgViews,
-						y: avgUploadRate,
-						label: `${channelName}(${channelLink})`,
-            avgViews: `${numberToAbbrev(Math.round(avgViews))} views/video for last 10 videos`,
-            avgUploadRate: `${avgUploadRate.toFixed(2)} videos/month for last 10 videos`,
-            emailLink
-        }
-        
-        // return result
-        finalResult.push(result);
+    const result = {
+      channelName,
+      channelLink,
+      subscriberCount,
+      x: avgViews,
+      y: avgUploadRate,
+      label: `${channelName}(${channelLink})`,
+      avgViews: `${numberToAbbrev(Math.round(avgViews))} views/video for last 10 videos`,
+      avgUploadRate: `${avgUploadRate.toFixed(2)} videos/month for last 10 videos`,
+      emailLink
     }
+    
+    // return result
+    finalResult.push(result);
+  }
 
-    // console.log(finalResult);
-    await browser.close();
+  return finalResult
 
-		return finalResult;
+}
+
+async function getChannelsFromSearchQuery(query, rangeStart, rangeEnd) {
+  const browser = await puppeteer.launch();
+  const page = await browser.newPage();
+  page.setViewport({ width: 1280, height: 926 });
+
+
+  
+  // Search for all channels for a given query
+  await page.goto(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}&sp=EgIQAg%253D%253D`, { waitUntil: 'networkidle2' });
+  await page.waitForSelector("div#container.ytd-search.style-scope", { timeout: 10000 });
+  
+
+  console.log("Scraping channels");
+
+  let channelLinks = await scrapeInfiniteScrollItems(page, extractItems, rangeEnd);
+
+  // print channel links to console
+  if (channelLinks.length < rangeStart || channelLinks.length < rangeEnd) {
+    console.log(`Only retrieved ${channelLinks.length} channels, therefore could not get channels in the range of ${rangeStart} up to ${rangeEnd}`);
+    browser.close();
+    return
+  }
+
+  channelLinks = channelLinks.slice(rangeStart-1, rangeEnd);
+  // console.log(channelLinks);
+
+  console.log("Processing channels, please wait...");
+  let finalResult = await processChannels(page, channelLinks);
+
+  await browser.close();
+
+  return finalResult;
+}
+
+async function extractNextWatchVideos(page) {
+	const videoElems = Array.from(document.querySelectorAll('yt-lockup-view-model yt-lockup-metadata-view-model'));
+
+	let links = [];
+
+	for (const videoElem of videoElems) {
+    let videoLink = videoElem.querySelector('a.yt-lockup-metadata-view-model__title')?.href;
+    links.push(videoLink)
+	}
+
+	return links
+}
+
+
+async function extractChannelFromVideo(page) {
+  let elem = document.querySelector('ytd-video-owner-renderer ytd-channel-name a.yt-formatted-string');
+	const channelLink = elem?.href;
+	const channelName = elem?.textContent;
+
+  return [channelLink, channelName];
+}
+
+
+async function getChannelsFromVideoLink(videoLink, rangeStart, rangeEnd) {
+  const browser = await puppeteer.launch();
+  const page = await browser.newPage();
+  page.setViewport({ width: 1280, height: 926 });
+
+  console.log("Retrieving channels from video link...");
+  
+  // Search for next-videos based o na given video
+  await page.goto(videoLink, { waitUntil: 'networkidle2' });
+  await page.waitForSelector("ytd-watch-next-secondary-results-renderer", { timeout: 10000 });
+  
+
+  console.log("Scraping next-watch videos...");
+  
+  let nextWatchVideos = await page.evaluate(extractNextWatchVideos);
+  
+  console.log("Extracting channels from videos...");
+  
+  let channelLinks = [];
+  
+  for (let video of nextWatchVideos) {
+    await page.goto(video, { waitUntil: 'networkidle2' });
+    await page.waitForSelector("ytd-video-owner-renderer", { timeout: 10000 });
+    let channelInfo = await page.evaluate(extractChannelFromVideo);
+
+    if (channelInfo == [null, null]) {continue}
+    channelLinks.push(channelInfo)
+  }
+
+  console.log(`Found ${channelLinks.length} channels`);
+  console.log("Removing duplicate channels and retrieving channel information...");
+
+  channelLinks = [...new Set(channelLinks)];
+
+  let finalResult = await processChannels(page, channelLinks)
+
+  await browser.close();
+
+  return finalResult;
 }
 
 function parseDaysAgo(daysAgo) {
@@ -321,4 +391,4 @@ async function getInputs() {
 		return [query, rangeStart, rangeEnd];
 }
 
-module.exports = {getInputs, getChannelsFromSearchQuery};
+module.exports = {getInputs, askQuestion, getChannelsFromSearchQuery, getChannelsFromVideoLink};
